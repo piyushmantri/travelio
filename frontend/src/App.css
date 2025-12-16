@@ -341,38 +341,17 @@
   font-weight: 600;
 }
 
-.traveller-summary {
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-  list-style: none;
-}
-
-.traveller-summary li {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.traveller-label {
-  font-size: 0.8rem;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.traveller-count {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #0f172a;
-}
-
 .date-range {
   margin: 0;
   color: #475569;
   font-size: 0.85rem;
+}
+
+.traveller-total {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 
 .itinerary-edit-form {

@@ -28,21 +28,6 @@ type Itinerary = {
   endDate: string | null;
 };
 
-const timestampFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-const formatTimestamp = (timestamp: FirestoreTimestamp | null): string => {
-  if (!timestamp) return "";
-  try {
-    return timestampFormatter.format(timestamp.toDate());
-  } catch (error) {
-    console.error("Failed to format timestamp", error);
-    return "";
-  }
-};
-
 const deriveReadableError = (error: unknown): string => {
   if (typeof error === "string") return error;
   if (error && typeof error === "object" && "message" in error) {
@@ -788,8 +773,15 @@ function App() {
               <p className="muted">Loading itineraries...</p>
             ) : itineraries.length ? (
               <div className="itinerary-grid">
-                {itineraries.map((itinerary) => (
-                  <article key={itinerary.id} className="itinerary-card-item">
+                {itineraries.map((itinerary) => {
+                  const totalTravellers =
+                    itinerary.travellers.males +
+                    itinerary.travellers.females +
+                    itinerary.travellers.kids;
+                  const travellerLabel = totalTravellers === 1 ? "traveller" : "travellers";
+
+                  return (
+                    <article key={itinerary.id} className="itinerary-card-item">
                     <div className="itinerary-card-heading">
                       <h3>{itinerary.title}</h3>
                     </div>
@@ -798,20 +790,9 @@ function App() {
                       {formatDateRange(itinerary.startDate, itinerary.endDate)}
                     </p>
 
-                    <ul className="traveller-summary" aria-label="Traveller breakdown">
-                      <li>
-                        <span className="traveller-label">Males</span>
-                        <span className="traveller-count">{itinerary.travellers.males}</span>
-                      </li>
-                      <li>
-                        <span className="traveller-label">Females</span>
-                        <span className="traveller-count">{itinerary.travellers.females}</span>
-                      </li>
-                      <li>
-                        <span className="traveller-label">Kids</span>
-                        <span className="traveller-count">{itinerary.travellers.kids}</span>
-                      </li>
-                    </ul>
+                    <p className="traveller-total" aria-label="Total travellers">
+                      {totalTravellers} {travellerLabel}
+                    </p>
 
                     {editingItineraryId === itinerary.id ? (
                       <form
@@ -937,7 +918,8 @@ function App() {
                       </div>
                     )}
                   </article>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="empty-state">
