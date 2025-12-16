@@ -540,10 +540,11 @@
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
+  position: relative;
 }
 
 .calendar-time-column {
-  flex: 0 0 72px;
+  flex: 0 0 96px;
   display: flex;
   flex-direction: column;
   background: #f8fafc;
@@ -558,7 +559,7 @@
 
 .calendar-hour-cell {
   height: 48px;
-  padding: 0.35rem 0.75rem;
+  padding: 0.35rem 1rem;
   font-size: 0.75rem;
   color: #64748b;
   display: flex;
@@ -687,8 +688,8 @@
 
 .calendar-event {
   position: absolute;
-  left: 0.15rem;
-  right: 0.15rem;
+  left: 0;
+  width: 100%;
   padding: 0.45rem 0.55rem;
   background: rgba(37, 99, 235, 0.18);
   border-left: 4px solid #1d4ed8;
@@ -701,6 +702,7 @@
   line-height: 1.2;
   box-shadow: 0 8px 22px -18px rgba(15, 23, 42, 0.45);
   cursor: grab;
+  box-sizing: border-box;
 }
 
 .calendar-event--dragging {
@@ -761,6 +763,30 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.calendar-event-form--floating {
+  position: absolute;
+  width: 320px;
+  min-width: 260px;
+  max-width: min(320px, 90vw);
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 28px 65px -30px rgba(15, 23, 42, 0.6);
+  z-index: 5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.calendar-event-form--floating[data-placement="left"] {
+  transform-origin: center right;
+}
+
+.calendar-event-form--floating[data-placement="right"] {
+  transform-origin: center left;
 }
 
 .calendar-event-grid {

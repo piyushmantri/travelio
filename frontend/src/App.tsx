@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent, PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent } from "react";
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -51,6 +51,19 @@ type CalendarSelection = {
   startMinutes: number;
   endDate: string;
   endMinutes: number;
+};
+
+type CalendarSegment = {
+  event: ItineraryEvent;
+  segmentStartMinutes: number;
+  segmentEndMinutes: number;
+  isStartSegment: boolean;
+  isEndSegment: boolean;
+};
+
+type CalendarLayoutSegment = CalendarSegment & {
+  columnIndex: number;
+  columnCount: number;
 };
 
 const deriveReadableError = (error: unknown): string => {
@@ -133,6 +146,10 @@ const formatDateRange = (startDate: string | null, endDate: string | null): stri
 
 const HOUR_MARKERS = Array.from({ length: 24 }, (_, index) => index);
 const CALENDAR_SLOT_HEIGHT_PX = 48;
+const CALENDAR_FORM_WIDTH_PX = 320;
+const CALENDAR_FORM_HEIGHT_PX = 320;
+const CALENDAR_FORM_GUTTER_PX = 16;
+const CALENDAR_EVENT_GUTTER_PX = 6;
 const ISO_DATE_TIME_PATTERN = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})$/;
 const padTimeSegment = (value: number): string => String(value).padStart(2, "0");
 const TOTAL_DAY_MINUTES = 24 * 60;
@@ -148,6 +165,76 @@ const formatHourLabel = (hour: number): string => {
   const period = hour >= 12 ? "PM" : "AM";
   const hourInTwelve = hour % 12 || 12;
   return `${hourInTwelve}:00 ${period}`;
+};
+
+const formatDateToIsoLocal = (date: Date): string => {
+  return `${date.getFullYear()}-${padTimeSegment(date.getMonth() + 1)}-${padTimeSegment(date.getDate())}`;
+};
+
+const layoutSegmentsWithColumns = (segments: CalendarSegment[]): CalendarLayoutSegment[] => {
+  if (segments.length === 0) {
+    return [];
+  }
+
+  type WorkingSegment = CalendarLayoutSegment & { groupId: number };
+
+  const laidOut: WorkingSegment[] = [];
+  const active: WorkingSegment[] = [];
+  const freeColumns: number[] = [];
+  let nextColumnIndex = 0;
+  let currentGroupId = 0;
+
+  const groupMeta = new Map<number, { maxColumns: number; members: WorkingSegment[] }>();
+
+  const releaseFinished = (startMinutes: number) => {
+    for (let index = active.length - 1; index >= 0; index -= 1) {
+      if (active[index].segmentEndMinutes <= startMinutes) {
+        freeColumns.push(active[index].columnIndex);
+        active.splice(index, 1);
+      }
+    }
+  };
+
+  segments.forEach((segment) => {
+    releaseFinished(segment.segmentStartMinutes);
+
+    if (active.length === 0) {
+      freeColumns.length = 0;
+      nextColumnIndex = 0;
+      currentGroupId += 1;
+    }
+
+    const columnIndex = freeColumns.length ? freeColumns.pop()! : nextColumnIndex++;
+    const workingSegment: WorkingSegment = {
+      ...segment,
+      columnIndex,
+      columnCount: 1,
+      groupId: currentGroupId,
+    };
+
+    active.push(workingSegment);
+    laidOut.push(workingSegment);
+
+    let meta = groupMeta.get(currentGroupId);
+    if (!meta) {
+      meta = { maxColumns: 0, members: [] };
+      groupMeta.set(currentGroupId, meta);
+    }
+
+    if (columnIndex + 1 > meta.maxColumns) {
+      meta.maxColumns = columnIndex + 1;
+    }
+
+    meta.members.push(workingSegment);
+  });
+
+  groupMeta.forEach((meta) => {
+    meta.members.forEach((segment) => {
+      segment.columnCount = meta.maxColumns;
+    });
+  });
+
+  return laidOut.map(({ groupId: _ignored, ...rest }) => rest);
 };
 
 type CalendarDay = {
@@ -179,11 +266,11 @@ const buildCalendarDays = (start: string | null, end: string | null): CalendarDa
     return [];
   }
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = formatDateToIsoLocal(new Date());
   const days: CalendarDay[] = [];
 
   for (let cursor = new Date(startDate); cursor <= endDate; cursor.setDate(cursor.getDate() + 1)) {
-    const iso = cursor.toISOString().slice(0, 10);
+    const iso = formatDateToIsoLocal(cursor);
     days.push({
       iso,
       weekdayLabel: calendarWeekdayFormatter.format(cursor),
@@ -1369,6 +1456,8 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
   const [eventFormError, setEventFormError] = useState<string | null>(null);
   const [eventSaving, setEventSaving] = useState(false);
   const [eventStatusMessage, setEventStatusMessage] = useState<string | null>(null);
+  const [eventFormPosition, setEventFormPosition] = useState<{ top: number; left: number } | null>(null);
+  const [eventFormPlacement, setEventFormPlacement] = useState<"left" | "right">("right");
   const dragSelectionRef = useRef<{
     anchorDate: string;
     anchorMinutes: number;
@@ -1376,6 +1465,8 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
     currentMinutes: number;
   } | null>(null);
   const dayBodyRefs = useRef(new Map<string, HTMLDivElement>());
+  const eventFormRef = useRef<HTMLFormElement | null>(null);
+  const calendarGridRef = useRef<HTMLDivElement | null>(null);
   const [eventDragState, setEventDragState] = useState<null | {
     eventId: string;
     date: string;
@@ -1398,6 +1489,7 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
 
     return () => window.clearTimeout(timeout);
   }, [statusMessage]);
+
 
   useEffect(() => {
     if (!eventStatusMessage) {
@@ -1735,11 +1827,15 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
     setIsDraggingSelection(false);
     setShowEventForm(false);
     setEventFormError(null);
+    setEventFormPosition(null);
+    setEventFormPlacement("right");
     resetEventDraft();
   };
 
   const openEventComposer = (range: CalendarSelection) => {
     setSelectionRange(range);
+    setEventFormPosition(null);
+    setEventFormPlacement("right");
     setDragSelection(null);
     dragSelectionRef.current = null;
     setIsDraggingSelection(false);
@@ -2144,6 +2240,20 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
     : undefined;
   const totalCalendarMinutes = calendarDays.length * TOTAL_DAY_MINUTES;
 
+  const floatingFormStyle: CSSProperties = eventFormPosition
+    ? {
+        top: `${eventFormPosition.top}px`,
+        left: `${eventFormPosition.left}px`,
+        opacity: 1,
+        pointerEvents: "auto",
+      }
+    : {
+        top: "0px",
+        left: "0px",
+        opacity: 0,
+        pointerEvents: "none",
+      };
+
   const dayIndexMap = useMemo(() => {
     const map = new Map<string, number>();
     calendarDays.forEach((day, index) => map.set(day.iso, index));
@@ -2157,6 +2267,93 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
       dayBodyRefs.current.delete(date);
     }
   };
+
+  const updateEventFormPosition = useCallback(
+    (range: CalendarSelection, dimensions?: { width: number; height: number }) => {
+      const gridElement = calendarGridRef.current;
+      if (!gridElement) {
+        return;
+      }
+
+      const startDayElement = dayBodyRefs.current.get(range.startDate);
+      if (!startDayElement) {
+        setEventFormPosition(null);
+        return;
+      }
+
+      const formWidth = dimensions?.width ?? CALENDAR_FORM_WIDTH_PX;
+      const formHeight = dimensions?.height ?? CALENDAR_FORM_HEIGHT_PX;
+
+      const gridRect = gridElement.getBoundingClientRect();
+      const dayBodyRect = startDayElement.getBoundingClientRect();
+
+      const selectionStartOffset =
+        dayBodyRect.top - gridRect.top + (range.startMinutes / 60) * CALENDAR_SLOT_HEIGHT_PX;
+      const selectionEndOffset =
+        dayBodyRect.top - gridRect.top + (range.endMinutes / 60) * CALENDAR_SLOT_HEIGHT_PX;
+      const selectionCenter = (selectionStartOffset + selectionEndOffset) / 2;
+
+      const maxTop = Math.max(
+        gridElement.scrollHeight - formHeight - CALENDAR_FORM_GUTTER_PX,
+        CALENDAR_FORM_GUTTER_PX
+      );
+      let top = selectionCenter - formHeight / 2;
+      if (!Number.isFinite(top)) {
+        top = 0;
+      }
+      top = Math.max(CALENDAR_FORM_GUTTER_PX, Math.min(top, maxTop));
+
+      const offsetLeft = dayBodyRect.left - gridRect.left;
+      const preferredLeft = offsetLeft + startDayElement.clientWidth + CALENDAR_FORM_GUTTER_PX;
+      const maxLeft = Math.max(
+        gridElement.scrollWidth - formWidth - CALENDAR_FORM_GUTTER_PX,
+        CALENDAR_FORM_GUTTER_PX
+      );
+      let left = Math.max(CALENDAR_FORM_GUTTER_PX, Math.min(preferredLeft, maxLeft));
+      let placement: "left" | "right" = "right";
+
+      if (preferredLeft > maxLeft && offsetLeft > formWidth + CALENDAR_FORM_GUTTER_PX) {
+        left = Math.max(CALENDAR_FORM_GUTTER_PX, offsetLeft - formWidth - CALENDAR_FORM_GUTTER_PX);
+        placement = "left";
+      }
+
+      setEventFormPlacement(placement);
+      setEventFormPosition((previous) => {
+        if (previous && Math.abs(previous.top - top) < 0.5 && Math.abs(previous.left - left) < 0.5) {
+          return previous;
+        }
+
+        return { top, left };
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!showEventForm || !selectionRange) {
+      return;
+    }
+
+    const update = () => {
+      const width = eventFormRef.current?.offsetWidth ?? CALENDAR_FORM_WIDTH_PX;
+      const height = eventFormRef.current?.offsetHeight ?? CALENDAR_FORM_HEIGHT_PX;
+      updateEventFormPosition(selectionRange, { width, height });
+    };
+
+    update();
+
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("resize", update);
+    };
+  }, [showEventForm, selectionRange, updateEventFormPosition, calendarDays]);
+
+  useEffect(() => {
+    if (!showEventForm) {
+      setEventFormPosition(null);
+      setEventFormPlacement("right");
+    }
+  }, [showEventForm]);
 
   const normalizeSelection = (
     anchorDate: string,
@@ -2473,7 +2670,7 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
                       </p>
                     ) : null}
                     <div className="calendar-scroll" role="group" aria-label={calendarRangeLabel}>
-                      <div className="calendar-grid">
+                      <div className="calendar-grid" ref={calendarGridRef}>
                         <div className="calendar-time-column" aria-hidden="true">
                           <div className="calendar-time-spacer" />
                           {HOUR_MARKERS.map((hour) => (
@@ -2483,7 +2680,7 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
                           ))}
                         </div>
                         {calendarDays.map((day) => {
-                          const dayEvents = events
+                          const daySegments: CalendarSegment[] = events
                             .map((entry) => {
                               const parsedStart = parseIsoLocalDateTime(entry.startDateTime);
                               const parsedEnd = parseIsoLocalDateTime(entry.endDateTime);
@@ -2525,16 +2722,12 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
                                 isEndSegment: eventEndAbs <= dayEndAbs,
                               };
                             })
-                            .filter((segment): segment is {
-                              event: ItineraryEvent;
-                              segmentStartMinutes: number;
-                              segmentEndMinutes: number;
-                              isStartSegment: boolean;
-                              isEndSegment: boolean;
-                            } =>
+                            .filter((segment): segment is CalendarSegment =>
                               Boolean(segment && segment.segmentEndMinutes > segment.segmentStartMinutes)
                             )
                             .sort((a, b) => a.segmentStartMinutes - b.segmentStartMinutes);
+
+                          const layoutSegments = layoutSegmentsWithColumns(daySegments);
 
                           return (
                             <div
@@ -2597,9 +2790,9 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
                                   />
                                 ))}
 
-                                <div className="calendar-day-events" aria-hidden={dayEvents.length === 0}
+                                <div className="calendar-day-events" aria-hidden={layoutSegments.length === 0}
                                 >
-                                  {dayEvents.map((segment) => {
+                                  {layoutSegments.map((segment) => {
                                     const { event: calendarEvent, segmentStartMinutes, segmentEndMinutes } = segment;
 
                                     const isDraggedSegment =
@@ -2626,6 +2819,11 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
                                     const canResizeEnd = isSingleDaySegment;
                                     const canMoveEvent = isSingleDaySegment;
 
+                                    const widthFraction = 100 / segment.columnCount;
+                                    const leftFraction = widthFraction * segment.columnIndex;
+                                    const widthExpression = `calc(${widthFraction}% - ${CALENDAR_EVENT_GUTTER_PX * 2}px)`;
+                                    const leftExpression = `calc(${leftFraction}% + ${CALENDAR_EVENT_GUTTER_PX}px)`;
+
                                     return (
                                       <div
                                         key={`${calendarEvent.id}-${day.iso}`}
@@ -2633,6 +2831,8 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
                                         style={{
                                           top: `${topOffset}px`,
                                           height: `${Math.max(blockHeight, 24)}px`,
+                                          left: leftExpression,
+                                          width: widthExpression,
                                         }}
                                         onPointerDown={
                                           canMoveEvent
@@ -2699,6 +2899,137 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
                             </div>
                           );
                         })}
+                        {showEventForm ? (
+                          <form
+                            ref={eventFormRef}
+                            className="calendar-event-form calendar-event-form--floating"
+                            data-placement={eventFormPlacement}
+                            style={floatingFormStyle}
+                            onSubmit={handleEventSubmit}
+                          >
+                            <div className="calendar-event-grid">
+                              <label className="field">
+                                <span>Title</span>
+                                <input
+                                  type="text"
+                                  value={eventDraft.title}
+                                  onChange={(event) =>
+                                    setEventDraft((previous) => ({
+                                      ...previous,
+                                      title: event.target.value,
+                                    }))
+                                  }
+                                  required
+                                  disabled={eventSaving}
+                                />
+                              </label>
+                              <label className="field">
+                                <span>Start date</span>
+                                <input
+                                  type="date"
+                                  value={eventDraft.startDate}
+                                  onChange={(event) =>
+                                    setEventDraft((previous) => ({
+                                      ...previous,
+                                      startDate: event.target.value,
+                                      endDate:
+                                        previous.endDate && previous.endDate < event.target.value
+                                          ? event.target.value
+                                          : previous.endDate,
+                                    }))
+                                  }
+                                  required
+                                  disabled={eventSaving}
+                                  min={draft.startDate || undefined}
+                                  max={draft.endDate || undefined}
+                                />
+                              </label>
+                              <label className="field">
+                                <span>Start time</span>
+                                <input
+                                  type="time"
+                                  value={eventDraft.startTime}
+                                  onChange={(event) =>
+                                    setEventDraft((previous) => ({
+                                      ...previous,
+                                      startTime: event.target.value,
+                                    }))
+                                  }
+                                  required
+                                  disabled={eventSaving}
+                                  step={900}
+                                />
+                              </label>
+                              <label className="field">
+                                <span>End date</span>
+                                <input
+                                  type="date"
+                                  value={eventDraft.endDate}
+                                  onChange={(event) =>
+                                    setEventDraft((previous) => ({
+                                      ...previous,
+                                      endDate: event.target.value,
+                                    }))
+                                  }
+                                  required
+                                  disabled={eventSaving}
+                                  min={eventDraft.startDate || draft.startDate || undefined}
+                                  max={draft.endDate || undefined}
+                                />
+                              </label>
+                              <label className="field">
+                                <span>End time</span>
+                                <input
+                                  type="time"
+                                  value={eventDraft.endTime}
+                                  onChange={(event) =>
+                                    setEventDraft((previous) => ({
+                                      ...previous,
+                                      endTime: event.target.value,
+                                    }))
+                                  }
+                                  required
+                                  disabled={eventSaving}
+                                  step={900}
+                                />
+                              </label>
+                            </div>
+
+                            <label className="field">
+                              <span>Notes (optional)</span>
+                              <textarea
+                                value={eventDraft.description}
+                                onChange={(event) =>
+                                  setEventDraft((previous) => ({
+                                    ...previous,
+                                    description: event.target.value,
+                                  }))
+                                }
+                                disabled={eventSaving}
+                              />
+                            </label>
+
+                            {eventFormError ? (
+                              <p className="error" role="alert">
+                                {eventFormError}
+                              </p>
+                            ) : null}
+
+                            <div className="calendar-event-actions">
+                              <button className="primary" type="submit" disabled={eventSaving}>
+                                {eventSaving ? "Saving..." : "Save event"}
+                              </button>
+                              <button
+                                className="secondary"
+                                type="button"
+                                onClick={() => cancelEventCreation()}
+                                disabled={eventSaving}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        ) : null}
                       </div>
                     </div>
                     {eventsLoading ? (
@@ -2713,126 +3044,7 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
                   </div>
                 )}
 
-                {showEventForm ? (
-                  <form className="calendar-event-form" onSubmit={handleEventSubmit}>
-                    <div className="calendar-event-grid">
-                      <label className="field">
-                        <span>Title</span>
-                        <input
-                          type="text"
-                          value={eventDraft.title}
-                          onChange={(event) =>
-                            setEventDraft((previous) => ({
-                              ...previous,
-                              title: event.target.value,
-                            }))
-                          }
-                          required
-                          disabled={eventSaving}
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Start date</span>
-                        <input
-                          type="date"
-                          value={eventDraft.startDate}
-                          onChange={(event) =>
-                            setEventDraft((previous) => ({
-                              ...previous,
-                              startDate: event.target.value,
-                              endDate:
-                                previous.endDate && previous.endDate < event.target.value
-                                  ? event.target.value
-                                  : previous.endDate,
-                            }))
-                          }
-                          required
-                          disabled={eventSaving}
-                          min={draft.startDate || undefined}
-                          max={draft.endDate || undefined}
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Start time</span>
-                        <input
-                          type="time"
-                          value={eventDraft.startTime}
-                          onChange={(event) =>
-                            setEventDraft((previous) => ({
-                              ...previous,
-                              startTime: event.target.value,
-                            }))
-                          }
-                          required
-                          disabled={eventSaving}
-                          step={900}
-                        />
-                      </label>
-                      <label className="field">
-                        <span>End date</span>
-                        <input
-                          type="date"
-                          value={eventDraft.endDate}
-                          onChange={(event) =>
-                            setEventDraft((previous) => ({
-                              ...previous,
-                              endDate: event.target.value,
-                            }))
-                          }
-                          required
-                          disabled={eventSaving}
-                          min={eventDraft.startDate || draft.startDate || undefined}
-                          max={draft.endDate || undefined}
-                        />
-                      </label>
-                      <label className="field">
-                        <span>End time</span>
-                        <input
-                          type="time"
-                          value={eventDraft.endTime}
-                          onChange={(event) =>
-                            setEventDraft((previous) => ({
-                              ...previous,
-                              endTime: event.target.value,
-                            }))
-                          }
-                          required
-                          disabled={eventSaving}
-                          step={900}
-                        />
-                      </label>
-                    </div>
-
-                    <label className="field">
-                      <span>Notes (optional)</span>
-                      <textarea
-                        value={eventDraft.description}
-                        onChange={(event) =>
-                          setEventDraft((previous) => ({
-                            ...previous,
-                            description: event.target.value,
-                          }))
-                        }
-                        disabled={eventSaving}
-                      />
-                    </label>
-
-                    {eventFormError ? (
-                      <p className="error" role="alert">
-                        {eventFormError}
-                      </p>
-                    ) : null}
-
-                    <div className="calendar-event-actions">
-                      <button className="primary" type="submit" disabled={eventSaving}>
-                        {eventSaving ? "Saving..." : "Save event"}
-                      </button>
-                      <button className="secondary" type="button" onClick={() => cancelEventCreation()} disabled={eventSaving}>
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                ) : shouldShowCalendar ? (
+                {!showEventForm && shouldShowCalendar ? (
                   <p className="calendar-instructions muted">
                     Click or drag across the calendar to add an event.
                   </p>
