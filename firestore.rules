@@ -4,6 +4,22 @@ service cloud.firestore {
     match /itineraries/{itineraryId} {
       allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
       allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.ownerUid;
+
+      match /events/{eventId} {
+        function parentOwnerUid() {
+          return get(/databases/$(database)/documents/itineraries/$(itineraryId)).data.ownerUid;
+        }
+
+        allow create: if
+          request.auth != null &&
+          request.auth.uid == request.resource.data.ownerUid &&
+          request.auth.uid == parentOwnerUid();
+
+        allow read, update, delete: if
+          request.auth != null &&
+          request.auth.uid == resource.data.ownerUid &&
+          request.auth.uid == parentOwnerUid();
+      }
     }
 
     match /profiles/{profileId} {
