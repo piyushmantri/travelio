@@ -13,6 +13,8 @@
         --subtle: #475569;
         --border: #e2e8f0;
         --accent: #2563eb;
+        --user: #1d4ed8;
+        --assistant: #0ea5e9;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -21,7 +23,12 @@
           --text: #e2e8f0;
           --subtle: #94a3b8;
           --border: #1e293b;
+          --user: #2563eb;
+          --assistant: #22d3ee;
         }
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
         margin: 0;
@@ -31,16 +38,8 @@
       }
       header {
         padding: 2.5rem 1.5rem 1.5rem;
-        max-width: 920px;
+        max-width: 960px;
         margin: 0 auto;
-      }
-      main {
-        max-width: 920px;
-        margin: 0 auto 4rem;
-        padding: 0 1.5rem 4rem;
-        display: flex;
-        flex-direction: column;
-        gap: 1.5rem;
       }
       h1 {
         margin: 0 0 0.5rem;
@@ -51,38 +50,85 @@
         font-size: 1.05rem;
         color: var(--subtle);
       }
+      main {
+        max-width: 960px;
+        margin: 0 auto 4rem;
+        padding: 0 1.5rem 4rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
       section.entry {
         background: var(--card);
         border-radius: 18px;
         border: 1px solid var(--border);
         padding: 1.5rem;
-        box-shadow: 0 24px 48px -32px rgba(37, 56, 88, 0.25);
+        box-shadow: 0 24px 48px -30px rgba(37, 56, 88, 0.22);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
       }
-      .entry h2 {
-        margin-top: 0;
+      section.entry h2 {
+        margin: 0;
         font-size: 1.1rem;
         color: var(--accent);
       }
+      .conversation {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .bubble {
+        max-width: 680px;
+        padding: 0.85rem 1rem;
+        border-radius: 14px;
+        background: rgba(148, 163, 184, 0.18);
+        position: relative;
+        line-height: 1.55;
+      }
+      .bubble.user {
+        align-self: flex-start;
+        background: rgba(29, 78, 216, 0.12);
+        border-left: 3px solid var(--user);
+      }
+      .bubble.assistant {
+        align-self: flex-end;
+        background: rgba(14, 165, 233, 0.12);
+        border-right: 3px solid var(--assistant);
+      }
       .speaker {
+        display: block;
         font-weight: 600;
+        font-size: 0.85rem;
         color: var(--subtle);
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.4rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
       }
       .message {
         white-space: pre-wrap;
-        line-height: 1.6;
       }
       footer {
-        max-width: 920px;
+        max-width: 960px;
         margin: 0 auto 3rem;
         padding: 0 1.5rem;
         color: var(--subtle);
         font-size: 0.85rem;
       }
-      code {
-        background: rgba(148, 163, 184, 0.12);
-        padding: 0.15rem 0.35rem;
-        border-radius: 6px;
+      .error-banner {
+        background: rgba(220, 38, 38, 0.15);
+        color: #b91c1c;
+        padding: 1rem;
+        border-radius: 12px;
+        border: 1px solid rgba(220, 38, 38, 0.3);
+      }
+      @media (max-width: 640px) {
+        section.entry {
+          padding: 1.25rem;
+        }
+        .bubble {
+          max-width: 100%;
+        }
       }
     </style>
   </head>
@@ -90,128 +136,112 @@
     <header>
       <h1>Travelio Project • Chat Archive</h1>
       <p class="lead">
-        A running log of conversations between the team and Codex. Append future entries
-        to this file to keep the full context handy.
+        This page renders the Markdown transcript stored under <code>/chat-archive/transcript.md</code>.
+        Append future sessions to that file to keep the full context handy.
       </p>
     </header>
-    <main>
-      <section class="entry" id="entry-20250101-1">
-        <h2>Session: Frontend Kickoff</h2>
-        <div class="speaker">User</div>
-        <div class="message">We have to create an application for creating travel itinerarys. To start with scaffold a frontend application in React.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Scaffolded a Vite + React + TypeScript app under <code>frontend/</code>, installed dependencies, and verified the build.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-2">
-        <h2>Session: Initial Push</h2>
-        <div class="speaker">User</div>
-        <div class="message">I have git repository : https://github.com/piyushmantri/travelio.git Push all the changes here.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Committed the scaffold and pushed <code>d0619fc</code> to <code>main</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-3">
-        <h2>Session: Firebase Login</h2>
-        <div class="speaker">User</div>
-        <div class="message">Create a login page where user will be asked for username and password. We will be deploying this on GCP. So, use GCP for all the use cases wherever and however needed.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Added Firebase Authentication (Identity Platform) login UI, fast-fail env checks, updated styling and README, built successfully.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-4">
-        <h2>Session: Push Login Flow</h2>
-        <div class="speaker">User</div>
-        <div class="message">Push the changes.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Committed <code>73f4a7c</code> (“Add Firebase-backed login page”) and pushed to <code>main</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-5">
-        <h2>Session: Firebase Config via CLI</h2>
-        <div class="speaker">User</div>
-        <div class="message">can you use gcloud commands to get the keys? If yes, run gcloud commands and get the required details</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Enabled required APIs, initialized Firebase via REST, created a web app, retrieved config values, and stored them in <code>.env.local</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-6">
-        <h2>Session: Display Name Toggle</h2>
-        <div class="speaker">User</div>
-        <div class="message">Give an option to edit the profile.. ask the user as what should we call them and use that name wherever we want to specify users name</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Added Firestore-backed profile names with a toggleable editor, updated rules, README, and pushed <code>2dedc7e</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-7">
-        <h2>Session: Minimal Greeting</h2>
-        <div class="speaker">User</div>
-        <div class="message">Make Welcome back card to as a heading instead of a card. It should a very minimal greeting and not occupy much space.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Turned the greeting into a slim header, rebuilt, and pushed <code>7d9ee1c</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-8">
-        <h2>Session: Profile Button in Header</h2>
-        <div class="speaker">User</div>
-        <div class="message">Give an option to edit the profile next to the sign out button. do not show option to edit the name on front page itself.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Added “Edit profile” toggle beside “Sign out”, hiding the form by default, pushed <code>2ca18f2</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-9">
-        <h2>Session: Itinerary Grid</h2>
-        <div class="speaker">User</div>
-        <div class="message">show a grid of itinerary and give an button to create new one.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Introduced grid layout, “New itinerary” toggle, committed <code>1600532</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-10">
-        <h2>Session: Traveller Counts on Create/Edit</h2>
-        <div class="speaker">User</div>
-        <div class="message">while creating the itinerary only ask for the name. no notes needed. Also, ask for the number of males, females and kids travelling. allow this to be edited later.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Added numeric traveller inputs, inline editing, updated README, pushed <code>abba575</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-11">
-        <h2>Session: Trip Dates</h2>
-        <div class="speaker">User</div>
-        <div class="message">ask for the start and end date of the trip as well while creating and also allow editing it later.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Added date inputs, validation, formatting, README updates, pushed <code>909e6e6</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-12">
-        <h2>Session: Header Cleanup</h2>
-        <div class="speaker">User</div>
-        <div class="message">create date is not needed on the card</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Removed created-at pill from itinerary cards, pushed <code>dc2e626</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-13">
-        <h2>Session: Total Travellers</h2>
-        <div class="speaker">User</div>
-        <div class="message">show total travellers on the card instead of breakdown.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Cards now display total traveller count, styles adjusted, pushed <code>0e6175e</code>.</div>
-      </section>
-
-      <section class="entry" id="entry-20250101-14">
-        <h2>Session: Transcript Archive</h2>
-        <div class="speaker">User</div>
-        <div class="message">create a page outside of this frontend project just to store the complete transcript of this chat and all the further chats that I'll have for this project.</div>
-        <div class="speaker">Codex</div>
-        <div class="message">Created this transcript page (<code>chat-transcript.html</code>) as the living archive.</div>
-      </section>
+    <main id="entries">
+      <div class="error-banner" id="loading">Loading transcript…</div>
     </main>
     <footer>
       <p>
-        To log future discussions, copy the section template above and append it with a new
-        <code>&lt;section class="entry"&gt;</code>. Keep the newest sessions near the bottom for easy reference.
+        To log future discussions, copy the Markdown pattern (<code>## Session Title</code> + <code>- **Speaker:**</code>
+        lines) inside <code>chat-archive/transcript.md</code>. This page will render them automatically.
       </p>
     </footer>
+    <script>
+      const mdPath = "chat-archive/transcript.md";
+      const container = document.getElementById("entries");
+      const loadingBanner = document.getElementById("loading");
+
+      function parseTranscript(markdown) {
+        const lines = markdown.split(/\r?\n/);
+        const sections = [];
+        let current = null;
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          if (line.startsWith("## ")) {
+            if (current) sections.push(current);
+            current = { title: line.replace(/^##\s*/, ""), messages: [] };
+          } else if (line.startsWith("- **")) {
+            if (!current) continue;
+            const match = line.match(/^\- \*\*(.+?)\:\*\*\s*(.*)$/);
+            if (match) {
+              const [, speaker, text] = match;
+              current.messages.push({ speaker, text });
+            } else {
+              current.messages.push({ speaker: "Note", text: line.replace(/^\-\s*/, "") });
+            }
+          }
+        }
+        if (current) sections.push(current);
+        return sections;
+      }
+
+      function renderSections(sections) {
+        container.innerHTML = "";
+        if (!sections.length) {
+          container.innerHTML = '<div class="error-banner">No transcript entries found.</div>';
+          return;
+        }
+
+        sections.forEach((section, index) => {
+          const sectionEl = document.createElement("section");
+          sectionEl.className = "entry";
+          sectionEl.id = `session-${index + 1}`;
+
+          const titleEl = document.createElement("h2");
+          titleEl.textContent = section.title;
+          sectionEl.appendChild(titleEl);
+
+          const convoEl = document.createElement("div");
+          convoEl.className = "conversation";
+
+          section.messages.forEach((message) => {
+            const bubble = document.createElement("div");
+            const normalizedSpeaker = message.speaker.toLowerCase();
+            bubble.className = `bubble ${normalizedSpeaker.includes("user") ? "user" : "assistant"}`;
+
+            const speakerLabel = document.createElement("span");
+            speakerLabel.className = "speaker";
+            speakerLabel.textContent = message.speaker;
+
+            const body = document.createElement("div");
+            body.className = "message";
+            body.textContent = message.text;
+
+            bubble.appendChild(speakerLabel);
+            bubble.appendChild(body);
+            convoEl.appendChild(bubble);
+          });
+
+          sectionEl.appendChild(convoEl);
+          container.appendChild(sectionEl);
+        });
+      }
+
+      async function loadTranscript() {
+        try {
+          const response = await fetch(mdPath);
+          if (!response.ok) {
+            throw new Error(`Failed to load transcript (${response.status})`);
+          }
+          const markdown = await response.text();
+          const sections = parseTranscript(markdown);
+          renderSections(sections);
+        } catch (error) {
+          container.innerHTML = `
+            <div class="error-banner">
+              Could not load transcript: ${error.message}
+            </div>
+          `;
+        }
+      }
+
+      loadTranscript().finally(() => {
+        if (loadingBanner) loadingBanner.remove();
+      });
+    </script>
   </body>
 </html>
