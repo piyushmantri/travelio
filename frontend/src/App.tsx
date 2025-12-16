@@ -73,6 +73,7 @@ function App() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [itinerariesLoading, setItinerariesLoading] = useState(false);
   const [itineraryError, setItineraryError] = useState<string | null>(null);
@@ -97,6 +98,7 @@ function App() {
       setProfileSaving(false);
       setProfileMessage(null);
       setProfileError(null);
+      setShowProfileEditor(false);
       return;
     }
 
@@ -330,6 +332,7 @@ function App() {
       setProfileError(deriveReadableError(error));
     } finally {
       setProfileSaving(false);
+      setShowProfileEditor(false);
     }
   };
 
@@ -386,46 +389,62 @@ function App() {
                 {profileName?.trim() || currentUser.displayName?.trim() || currentUser.email || currentUser.uid}
               </p>
             </div>
-            <button className="secondary" type="button" onClick={handleSignOut}>
-              Sign out
-            </button>
-          </header>
-
-          <section className="profile-panel" aria-live="polite">
-            <form className="profile-form" onSubmit={handleProfileSubmit}>
-              <label className="field profile-field">
-                <span>What should we call you?</span>
-                <input
-                  type="text"
-                  name="displayName"
-                  placeholder="Add a friendly name"
-                  value={profileDraft}
-                  onChange={(event) => setProfileDraft(event.target.value)}
-                  disabled={profileLoading || profileSaving}
-                  required
-                />
-              </label>
+            <div className="signed-in-actions">
               <button
                 className="secondary"
-                type="submit"
-                disabled={profileLoading || profileSaving}
+                type="button"
+                onClick={() => {
+                  setShowProfileEditor((visible) => !visible);
+                  setProfileMessage(null);
+                  setProfileError(null);
+                  setProfileDraft(profileName ?? "");
+                }}
               >
-                {profileSaving ? "Saving..." : "Save name"}
+                {showProfileEditor ? "Close" : "Edit profile"}
               </button>
-            </form>
+              <button className="secondary" type="button" onClick={handleSignOut}>
+                Sign out
+              </button>
+            </div>
+          </header>
 
-            {profileError ? (
-              <p className="error" role="alert">
-                {profileError}
-              </p>
-            ) : profileMessage ? (
-              <p className="profile-status" role="status">
-                {profileMessage}
-              </p>
-            ) : profileLoading ? (
-              <p className="muted">Loading profile...</p>
-            ) : null}
-          </section>
+          {showProfileEditor ? (
+            <section className="profile-panel" aria-live="polite">
+              <form className="profile-form" onSubmit={handleProfileSubmit}>
+                <label className="field profile-field">
+                  <span>What should we call you?</span>
+                  <input
+                    type="text"
+                    name="displayName"
+                    placeholder="Add a friendly name"
+                    value={profileDraft}
+                    onChange={(event) => setProfileDraft(event.target.value)}
+                    disabled={profileLoading || profileSaving}
+                    required
+                  />
+                </label>
+                <button
+                  className="secondary"
+                  type="submit"
+                  disabled={profileLoading || profileSaving}
+                >
+                  {profileSaving ? "Saving..." : "Save name"}
+                </button>
+              </form>
+
+              {profileError ? (
+                <p className="error" role="alert">
+                  {profileError}
+                </p>
+              ) : profileMessage ? (
+                <p className="profile-status" role="status">
+                  {profileMessage}
+                </p>
+              ) : profileLoading ? (
+                <p className="muted">Loading profile...</p>
+              ) : null}
+            </section>
+          ) : null}
 
           <section className="card itinerary-card" aria-live="polite">
             <div className="section-heading">
