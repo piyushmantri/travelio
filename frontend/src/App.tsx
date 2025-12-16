@@ -7,17 +7,11 @@ import {
   signOut,
 } from "firebase/auth";
 import type { User } from "firebase/auth";
-import {
-  Timestamp,
-  addDoc,
-  collection,
-  onSnapshot,
-  query,
-  serverTimestamp,
-  where,
-} from "firebase/firestore";
-import { auth, db } from "./firebase";
+import { auth, getFirestoreInstance, loadFirestore } from "./firebase";
 import "./App.css";
+
+type FirestoreTimestamp = import("firebase/firestore").Timestamp;
+type Unsubscribe = import("firebase/firestore").Unsubscribe;
 
 type AuthPhase = "idle" | "loading" | "authenticated" | "error";
 type AuthMode = "sign-in" | "sign-up";
@@ -25,7 +19,7 @@ type Itinerary = {
   id: string;
   title: string;
   description: string;
-  createdAt: Timestamp | null;
+  createdAt: FirestoreTimestamp | null;
 };
 
 const timestampFormatter = new Intl.DateTimeFormat(undefined, {
@@ -33,7 +27,7 @@ const timestampFormatter = new Intl.DateTimeFormat(undefined, {
   timeStyle: "short",
 });
 
-const formatTimestamp = (timestamp: Timestamp | null): string => {
+const formatTimestamp = (timestamp: FirestoreTimestamp | null): string => {
   if (!timestamp) return "";
   try {
     return timestampFormatter.format(timestamp.toDate());
@@ -49,6 +43,21 @@ const deriveReadableError = (error: unknown): string => {
     return String((error as { message: unknown }).message);
   }
   return "Something went wrong while processing your request.";
+};
+
+const loadFirestoreModule = loadFirestore;
+
+const asTimestamp = (value: unknown): FirestoreTimestamp | null => {
+  if (
+    value &&
+    typeof value === "object" &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    return value as FirestoreTimestamp;
+  }
+
+  return null;
 };
 
 function App() {
@@ -85,49 +94,73 @@ function App() {
     }
 
     setItinerariesLoading(true);
-    const userItinerariesQuery = query(
-      collection(db, "itineraries"),
-      where("ownerUid", "==", currentUser.uid)
-    );
 
-    const unsubscribe = onSnapshot(
-      userItinerariesQuery,
-      (snapshot) => {
-        const mapped = snapshot.docs
-          .map((docSnapshot) => {
-            const data = docSnapshot.data();
-            const createdAtValue =
-              data.createdAt instanceof Timestamp ? data.createdAt : null;
+    let unsubscribe: Unsubscribe | undefined;
+    let isActive = true;
 
-            return {
-              id: docSnapshot.id,
-              title:
-                typeof data.title === "string" && data.title.trim()
-                  ? data.title
-                  : "Untitled itinerary",
-              description:
-                typeof data.description === "string" ? data.description : "",
-              createdAt: createdAtValue,
-            } satisfies Itinerary;
-          })
-          .sort((first, second) => {
-            const firstTime = first.createdAt ? first.createdAt.toMillis() : 0;
-            const secondTime = second.createdAt ? second.createdAt.toMillis() : 0;
-            return secondTime - firstTime;
-          });
+    loadFirestoreModule()
+      .then(async ({ collection, query, where, onSnapshot }) => {
+        if (!isActive) {
+          return;
+        }
 
-        setItineraries(mapped);
-        setItineraryError(null);
-        setItinerariesLoading(false);
-      },
-      (error) => {
+        const firestore = await getFirestoreInstance();
+        const userItinerariesQuery = query(
+          collection(firestore, "itineraries"),
+          where("ownerUid", "==", currentUser.uid)
+        );
+
+        unsubscribe = onSnapshot(
+          userItinerariesQuery,
+          (snapshot) => {
+            const mapped = snapshot.docs
+              .map((docSnapshot) => {
+                const data = docSnapshot.data();
+
+                return {
+                  id: docSnapshot.id,
+                  title:
+                    typeof data.title === "string" && data.title.trim()
+                      ? data.title
+                      : "Untitled itinerary",
+                  description:
+                    typeof data.description === "string" ? data.description : "",
+                  createdAt: asTimestamp(data.createdAt),
+                } satisfies Itinerary;
+              })
+              .sort((first, second) => {
+                const firstTime = first.createdAt ? first.createdAt.toMillis() : 0;
+                const secondTime = second.createdAt ? second.createdAt.toMillis() : 0;
+                return secondTime - firstTime;
+              });
+
+            setItineraries(mapped);
+            setItineraryError(null);
+            setItinerariesLoading(false);
+          },
+          (error) => {
+            setItineraryError(deriveReadableError(error));
+            setItineraries([]);
+            setItinerariesLoading(false);
+          }
+        );
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+
         setItineraryError(deriveReadableError(error));
         setItineraries([]);
         setItinerariesLoading(false);
-      }
-    );
+      });
 
-    return unsubscribe;
+    return () => {
+      isActive = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [currentUser]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -181,7 +214,12 @@ function App() {
     setItineraryError(null);
 
     try {
-      await addDoc(collection(db, "itineraries"), {
+      const [{ addDoc, collection, serverTimestamp }, firestore] = await Promise.all([
+        loadFirestoreModule(),
+        getFirestoreInstance(),
+      ]);
+
+      await addDoc(collection(firestore, "itineraries"), {
         title: newItineraryTitle.trim(),
         description: newItineraryNotes.trim(),
         ownerUid: currentUser.uid,

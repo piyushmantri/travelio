@@ -1,7 +1,9 @@
 import { initializeApp } from "firebase/app";
 import type { FirebaseOptions } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+
+type Firestore = import("firebase/firestore").Firestore;
+type FirestoreModule = typeof import("firebase/firestore");
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,4 +23,26 @@ Object.entries(firebaseConfig).forEach(([key, value]) => {
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+let firestoreModulePromise: Promise<FirestoreModule> | null = null;
+const loadFirestoreModule = () => {
+  if (!firestoreModulePromise) {
+    firestoreModulePromise = import("firebase/firestore");
+  }
+
+  return firestoreModulePromise;
+};
+
+let firestoreInstancePromise: Promise<Firestore> | null = null;
+
+export const getFirestoreInstance = async (): Promise<Firestore> => {
+  if (!firestoreInstancePromise) {
+    firestoreInstancePromise = loadFirestoreModule().then(({ getFirestore }) =>
+      getFirestore(app)
+    );
+  }
+
+  return firestoreInstancePromise;
+};
+
+export const loadFirestore = loadFirestoreModule;

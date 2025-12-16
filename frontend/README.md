@@ -51,6 +51,16 @@ gcloud firestore databases create --project cloud-run-day-2025-471903 --location
 
 The frontend writes itineraries with an `ownerUid` filter so each user only sees their own records. If you change regions or database IDs, update the Firebase configuration accordingly.
 
+### Security rules
+
+Deploy the bundled `firestore.rules` to restrict read/write access so that users may only manage their own itineraries:
+
+```bash
+firebase deploy --only firestore:rules --project cloud-run-day-2025-471903 --non-interactive
+```
+
+The rules allow creates when the authenticated UID matches the `ownerUid` being written and limit reads/updates/deletes to documents owned by the requesting user.
+
 ## Production build
 
 ```bash

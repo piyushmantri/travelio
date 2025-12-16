@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /itineraries/{itineraryId} {
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.ownerUid;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
