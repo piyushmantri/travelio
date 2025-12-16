@@ -18,8 +18,12 @@ type AuthMode = "sign-in" | "sign-up";
 type Itinerary = {
   id: string;
   title: string;
-  description: string;
   createdAt: FirestoreTimestamp | null;
+  travellers: {
+    males: number;
+    females: number;
+    kids: number;
+  };
 };
 
 const timestampFormatter = new Intl.DateTimeFormat(undefined, {
@@ -60,6 +64,15 @@ const asTimestamp = (value: unknown): FirestoreTimestamp | null => {
   return null;
 };
 
+const coerceTravellerCount = (value: unknown): number => {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    return 0;
+  }
+
+  return Math.floor(numericValue);
+};
+
 function App() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -78,9 +91,21 @@ function App() {
   const [itinerariesLoading, setItinerariesLoading] = useState(false);
   const [itineraryError, setItineraryError] = useState<string | null>(null);
   const [newItineraryTitle, setNewItineraryTitle] = useState("");
-  const [newItineraryNotes, setNewItineraryNotes] = useState("");
+  const [newItineraryTravellers, setNewItineraryTravellers] = useState({
+    males: 0,
+    females: 0,
+    kids: 0,
+  });
   const [isCreatingItinerary, setIsCreatingItinerary] = useState(false);
   const [isItineraryFormVisible, setIsItineraryFormVisible] = useState(false);
+  const [editingItineraryId, setEditingItineraryId] = useState<string | null>(null);
+  const [editItineraryDraft, setEditItineraryDraft] = useState({
+    males: 0,
+    females: 0,
+    kids: 0,
+  });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -182,7 +207,7 @@ function App() {
       setItinerariesLoading(false);
       setItineraryError(null);
       setNewItineraryTitle("");
-      setNewItineraryNotes("");
+      setNewItineraryTravellers({ males: 0, females: 0, kids: 0 });
       setIsItineraryFormVisible(false);
       return;
     }
@@ -210,6 +235,10 @@ function App() {
             const mapped = snapshot.docs
               .map((docSnapshot) => {
                 const data = docSnapshot.data();
+                const travellersData =
+                  data && typeof data.travellers === "object"
+                    ? (data.travellers as Record<string, unknown>)
+                    : {};
 
                 return {
                   id: docSnapshot.id,
@@ -217,9 +246,12 @@ function App() {
                     typeof data.title === "string" && data.title.trim()
                       ? data.title
                       : "Untitled itinerary",
-                  description:
-                    typeof data.description === "string" ? data.description : "",
                   createdAt: asTimestamp(data.createdAt),
+                  travellers: {
+                    males: coerceTravellerCount(travellersData.males),
+                    females: coerceTravellerCount(travellersData.females),
+                    kids: coerceTravellerCount(travellersData.kids),
+                  },
                 } satisfies Itinerary;
               })
               .sort((first, second) => {
@@ -348,6 +380,19 @@ function App() {
       return;
     }
 
+    const trimmedTitle = newItineraryTitle.trim();
+
+    if (!trimmedTitle) {
+      setItineraryError("Itinerary name is required.");
+      return;
+    }
+
+    const travellers = {
+      males: coerceTravellerCount(newItineraryTravellers.males),
+      females: coerceTravellerCount(newItineraryTravellers.females),
+      kids: coerceTravellerCount(newItineraryTravellers.kids),
+    };
+
     setIsCreatingItinerary(true);
     setItineraryError(null);
 
@@ -358,19 +403,70 @@ function App() {
       ]);
 
       await addDoc(collection(firestore, "itineraries"), {
-        title: newItineraryTitle.trim(),
-        description: newItineraryNotes.trim(),
+        title: trimmedTitle,
         ownerUid: currentUser.uid,
+        travellers,
         createdAt: serverTimestamp(),
       });
 
       setNewItineraryTitle("");
-      setNewItineraryNotes("");
+      setNewItineraryTravellers({ males: 0, females: 0, kids: 0 });
       setIsItineraryFormVisible(false);
     } catch (error) {
       setItineraryError(deriveReadableError(error));
     } finally {
       setIsCreatingItinerary(false);
+    }
+  };
+
+  const beginEditItinerary = (itinerary: Itinerary) => {
+    setEditingItineraryId(itinerary.id);
+    setEditItineraryDraft({ ...itinerary.travellers });
+    setEditError(null);
+  };
+
+  const cancelEditItinerary = () => {
+    setEditingItineraryId(null);
+    setEditError(null);
+    setEditItineraryDraft({ males: 0, females: 0, kids: 0 });
+  };
+
+  const handleUpdateItinerary = async (
+    event: FormEvent<HTMLFormElement>,
+    itineraryId: string
+  ) => {
+    event.preventDefault();
+
+    if (!currentUser) {
+      setEditError("You need to be signed in to update an itinerary.");
+      return;
+    }
+
+    const travellers = {
+      males: coerceTravellerCount(editItineraryDraft.males),
+      females: coerceTravellerCount(editItineraryDraft.females),
+      kids: coerceTravellerCount(editItineraryDraft.kids),
+    };
+
+    setEditSaving(true);
+    setEditError(null);
+
+    try {
+      const [{ doc, updateDoc }, firestore] = await Promise.all([
+        loadFirestoreModule(),
+        getFirestoreInstance(),
+      ]);
+
+      const itineraryRef = doc(firestore, "itineraries", itineraryId);
+      await updateDoc(itineraryRef, {
+        travellers,
+      });
+
+      cancelEditItinerary();
+    } catch (error) {
+      setEditError(deriveReadableError(error));
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -483,17 +579,64 @@ function App() {
                   />
                 </label>
 
-                <label className="field">
-                  <span>Notes</span>
-                  <textarea
-                    name="itinerary-notes"
-                    placeholder="Add a quick summary or highlight key stops."
-                    value={newItineraryNotes}
-                    onChange={(event) => setNewItineraryNotes(event.target.value)}
-                    rows={4}
-                    disabled={isCreatingItinerary}
-                  />
-                </label>
+                <div className="traveller-grid">
+                  <label className="field compact-field">
+                    <span>Males</span>
+                    <input
+                      type="number"
+                      min={0}
+                      name="traveller-males"
+                      value={newItineraryTravellers.males}
+                      onChange={(event) =>
+                        setNewItineraryTravellers((prev) => ({
+                          ...prev,
+                          males: coerceTravellerCount(event.target.value),
+                        }))
+                      }
+                      disabled={isCreatingItinerary}
+                      inputMode="numeric"
+                      pattern="\\d*"
+                    />
+                  </label>
+
+                  <label className="field compact-field">
+                    <span>Females</span>
+                    <input
+                      type="number"
+                      min={0}
+                      name="traveller-females"
+                      value={newItineraryTravellers.females}
+                      onChange={(event) =>
+                        setNewItineraryTravellers((prev) => ({
+                          ...prev,
+                          females: coerceTravellerCount(event.target.value),
+                        }))
+                      }
+                      disabled={isCreatingItinerary}
+                      inputMode="numeric"
+                      pattern="\\d*"
+                    />
+                  </label>
+
+                  <label className="field compact-field">
+                    <span>Kids</span>
+                    <input
+                      type="number"
+                      min={0}
+                      name="traveller-kids"
+                      value={newItineraryTravellers.kids}
+                      onChange={(event) =>
+                        setNewItineraryTravellers((prev) => ({
+                          ...prev,
+                          kids: coerceTravellerCount(event.target.value),
+                        }))
+                      }
+                      disabled={isCreatingItinerary}
+                      inputMode="numeric"
+                      pattern="\\d*"
+                    />
+                  </label>
+                </div>
 
                 <button className="primary" type="submit" disabled={isCreatingItinerary}>
                   {isCreatingItinerary ? "Saving..." : "Create itinerary"}
@@ -519,10 +662,111 @@ function App() {
                         </span>
                       ) : null}
                     </div>
-                    {itinerary.description ? (
-                      <p className="itinerary-card-notes">{itinerary.description}</p>
+
+                    <ul className="traveller-summary" aria-label="Traveller breakdown">
+                      <li>
+                        <span className="traveller-label">Males</span>
+                        <span className="traveller-count">{itinerary.travellers.males}</span>
+                      </li>
+                      <li>
+                        <span className="traveller-label">Females</span>
+                        <span className="traveller-count">{itinerary.travellers.females}</span>
+                      </li>
+                      <li>
+                        <span className="traveller-label">Kids</span>
+                        <span className="traveller-count">{itinerary.travellers.kids}</span>
+                      </li>
+                    </ul>
+
+                    {editingItineraryId === itinerary.id ? (
+                      <form
+                        className="itinerary-edit-form"
+                        onSubmit={(event) => handleUpdateItinerary(event, itinerary.id)}
+                      >
+                        <div className="traveller-grid">
+                          <label className="field compact-field">
+                            <span>Males</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editItineraryDraft.males}
+                              onChange={(event) =>
+                                setEditItineraryDraft((prev) => ({
+                                  ...prev,
+                                  males: coerceTravellerCount(event.target.value),
+                                }))
+                              }
+                              disabled={editSaving}
+                              inputMode="numeric"
+                              pattern="\\d*"
+                            />
+                          </label>
+                          <label className="field compact-field">
+                            <span>Females</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editItineraryDraft.females}
+                              onChange={(event) =>
+                                setEditItineraryDraft((prev) => ({
+                                  ...prev,
+                                  females: coerceTravellerCount(event.target.value),
+                                }))
+                              }
+                              disabled={editSaving}
+                              inputMode="numeric"
+                              pattern="\\d*"
+                            />
+                          </label>
+                          <label className="field compact-field">
+                            <span>Kids</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editItineraryDraft.kids}
+                              onChange={(event) =>
+                                setEditItineraryDraft((prev) => ({
+                                  ...prev,
+                                  kids: coerceTravellerCount(event.target.value),
+                                }))
+                              }
+                              disabled={editSaving}
+                              inputMode="numeric"
+                              pattern="\\d*"
+                            />
+                          </label>
+                        </div>
+
+                        {editError ? (
+                          <p className="error" role="alert">
+                            {editError}
+                          </p>
+                        ) : null}
+
+                        <div className="edit-actions">
+                          <button className="primary" type="submit" disabled={editSaving}>
+                            {editSaving ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            className="secondary"
+                            type="button"
+                            onClick={cancelEditItinerary}
+                            disabled={editSaving}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
                     ) : (
-                      <p className="muted">No notes added yet.</p>
+                      <div className="card-actions">
+                        <button
+                          type="button"
+                          className="link-button"
+                          onClick={() => beginEditItinerary(itinerary)}
+                        >
+                          Edit details
+                        </button>
+                      </div>
                     )}
                   </article>
                 ))}

@@ -32,7 +32,7 @@ npm run dev
 
 Visit the printed URL (default `http://localhost:5173`) to either sign in or create a new account. Account creation uses `createUserWithEmailAndPassword`, so be sure Email/Password sign-in is enabled in Identity Platform.
 
-Authenticated users can create itineraries that are stored in Cloud Firestore under the `itineraries` collection. Each document records the owner UID, itinerary title, notes, and a server timestamp so users see their saved plans immediately after login.
+Authenticated users can create itineraries that are stored in Cloud Firestore under the `itineraries` collection. Each document records the owner UID, itinerary title, a traveller breakdown (males, females, kids), and a server timestamp so users see their saved plans immediately after login. Traveller counts can be adjusted later from each itinerary card.
 
 ## Firestore setup
 
