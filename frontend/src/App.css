@@ -124,6 +124,12 @@
   font-size: 0.85rem;
 }
 
+.form-note {
+  margin: -0.5rem 0 0;
+  color: #475569;
+  font-size: 0.8rem;
+}
+
 .auth-message {
   margin: 0 0 1rem;
   color: #1e293b;
@@ -133,6 +139,34 @@
   text-align: center;
   color: #64748b;
   font-size: 0.85rem;
+}
+
+.form-switch {
+  margin: 0;
+  color: #475569;
+  font-size: 0.85rem;
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.link-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 code {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
+  createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
@@ -10,13 +11,14 @@ import { auth } from "./firebase";
 import "./App.css";
 
 type AuthPhase = "idle" | "loading" | "authenticated" | "error";
+type AuthMode = "sign-in" | "sign-up";
 
 const deriveReadableError = (error: unknown): string => {
   if (typeof error === "string") return error;
   if (error && typeof error === "object" && "message" in error) {
     return String((error as { message: unknown }).message);
   }
-  return "Something went wrong while signing in.";
+  return "Something went wrong while processing your request.";
 };
 
 function App() {
@@ -25,6 +27,7 @@ function App() {
   const [phase, setPhase] = useState<AuthPhase>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [mode, setMode] = useState<AuthMode>("sign-in");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -41,7 +44,11 @@ function App() {
     setErrorMessage(null);
 
     try {
-      await signInWithEmailAndPassword(auth, username, password);
+      if (mode === "sign-in") {
+        await signInWithEmailAndPassword(auth, username, password);
+      } else {
+        await createUserWithEmailAndPassword(auth, username, password);
+      }
     } catch (error) {
       setPhase("error");
       setErrorMessage(deriveReadableError(error));
@@ -58,7 +65,15 @@ function App() {
     }
   };
 
+  const toggleMode = () => {
+    setUsername("");
+    setPassword("");
+    setErrorMessage(null);
+    setMode((prevMode) => (prevMode === "sign-in" ? "sign-up" : "sign-in"));
+  };
+
   const isAuthenticating = phase === "loading";
+  const isSignUp = mode === "sign-up";
 
   return (
     <div className="app-shell">
@@ -80,18 +95,22 @@ function App() {
       ) : (
         <section className="card auth-card" aria-live="polite">
           <form className="auth-form" onSubmit={handleSubmit}>
-            <h2>Sign in</h2>
-            <p className="form-helper">Use the credentials configured in Google Cloud Identity Platform.</p>
+            <h2>{isSignUp ? "Create an account" : "Sign in"}</h2>
+            <p className="form-helper">
+              {isSignUp
+                ? "Enter your email and a strong password to register a new Travelio account."
+                : "Use the credentials configured in Google Cloud Identity Platform."}
+            </p>
 
             <label className="field">
-              <span>Username</span>
+              <span>Email</span>
               <input
-                type="text"
+                type="email"
                 name="username"
                 autoComplete="username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
-                placeholder="your.username@example.com"
+                placeholder="you@example.com"
                 required
                 disabled={isAuthenticating}
               />
@@ -102,13 +121,19 @@ function App() {
               <input
                 type="password"
                 name="password"
-                autoComplete="current-password"
+                autoComplete={isSignUp ? "new-password" : "current-password"}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
                 disabled={isAuthenticating}
               />
             </label>
+
+            {isSignUp ? (
+              <p className="form-note">
+                Passwords must meet the policy you configure in Identity Platform.
+              </p>
+            ) : null}
 
             {errorMessage ? (
               <p className="error" role="alert">
@@ -117,9 +142,25 @@ function App() {
             ) : null}
 
             <button className="primary" type="submit" disabled={isAuthenticating}>
-              {isAuthenticating ? "Signing in..." : "Sign in"}
+              {isAuthenticating
+                ? "Processing..."
+                : isSignUp
+                  ? "Create account"
+                  : "Sign in"}
             </button>
           </form>
+
+          <p className="form-switch">
+            {isSignUp ? "Already have an account?" : "Need a Travelio account?"}
+            <button
+              type="button"
+              className="link-button"
+              onClick={toggleMode}
+              disabled={isAuthenticating}
+            >
+              {isSignUp ? "Sign in" : "Create one"}
+            </button>
+          </p>
         </section>
       )}
 
