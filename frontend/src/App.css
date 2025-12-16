@@ -61,13 +61,36 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.field textarea {
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 120px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
 .field input:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
   outline: none;
 }
 
+.field textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  outline: none;
+}
+
 .field input:disabled {
+  background-color: #f1f5f9;
+  cursor: not-allowed;
+}
+
+.field textarea:disabled {
   background-color: #f1f5f9;
   cursor: not-allowed;
 }
@@ -167,6 +190,103 @@
 .link-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.itinerary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.section-heading h2 {
+  margin: 0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+}
+
+.itinerary-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.itinerary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.itinerary-item {
+  padding: 1rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.itinerary-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.itinerary-title-row h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.pill {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.itinerary-notes {
+  margin: 0;
+  color: #334155;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.muted {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.empty-state {
+  margin: 0;
+  color: #475569;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 0.5rem 0;
 }
 
 code {

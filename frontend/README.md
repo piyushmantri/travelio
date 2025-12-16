@@ -32,6 +32,25 @@ npm run dev
 
 Visit the printed URL (default `http://localhost:5173`) to either sign in or create a new account. Account creation uses `createUserWithEmailAndPassword`, so be sure Email/Password sign-in is enabled in Identity Platform.
 
+Authenticated users can create itineraries that are stored in Cloud Firestore under the `itineraries` collection. Each document records the owner UID, itinerary title, notes, and a server timestamp so users see their saved plans immediately after login.
+
+## Firestore setup
+
+Ensure Cloud Firestore is enabled in the Google Cloud project:
+
+```bash
+gcloud services enable firestore.googleapis.com --project cloud-run-day-2025-471903
+gcloud firestore databases describe --project cloud-run-day-2025-471903 --database='(default)'
+```
+
+If a default native database does not exist, create one in your preferred region (example below uses `asia-south1`):
+
+```bash
+gcloud firestore databases create --project cloud-run-day-2025-471903 --location=asia-south1
+```
+
+The frontend writes itineraries with an `ownerUid` filter so each user only sees their own records. If you change regions or database IDs, update the Firebase configuration accordingly.
+
 ## Production build
 
 ```bash
