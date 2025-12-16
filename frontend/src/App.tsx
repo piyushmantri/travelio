@@ -1369,7 +1369,6 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
   const [eventFormError, setEventFormError] = useState<string | null>(null);
   const [eventSaving, setEventSaving] = useState(false);
   const [eventStatusMessage, setEventStatusMessage] = useState<string | null>(null);
-  const [eventsPermissionIssue, setEventsPermissionIssue] = useState(false);
   const dragSelectionRef = useRef<{
     anchorDate: string;
     anchorMinutes: number;
@@ -1537,7 +1536,6 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
 
     setEventsLoading(true);
     setEventsError(null);
-    setEventsPermissionIssue(false);
 
     loadFirestoreModule()
       .then(async ({ collection, onSnapshot, query, where }) => {
@@ -1590,7 +1588,6 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
             setEvents(next);
             setEventsLoading(false);
             setEventsError(null);
-            setEventsPermissionIssue(false);
           },
           (eventsErrorValue) => {
             if (!isActive) {
@@ -1600,13 +1597,11 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
             setEvents([]);
             setEventsLoading(false);
             const readable = deriveReadableError(eventsErrorValue);
-            if (typeof readable === "string" && readable.includes("Missing or insufficient permissions")) {
-              setEventsPermissionIssue(true);
-              setEventsError(null);
-            } else {
-              setEventsError(readable);
-              setEventsPermissionIssue(false);
-            }
+            setEventsError(
+              typeof readable === "string"
+                ? readable
+                : "Unable to load itinerary events right now."
+            );
           }
         );
       })
@@ -1618,13 +1613,11 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
         setEvents([]);
         setEventsLoading(false);
         const readable = deriveReadableError(eventsLoadError);
-        if (typeof readable === "string" && readable.includes("Missing or insufficient permissions")) {
-          setEventsPermissionIssue(true);
-          setEventsError(null);
-        } else {
-          setEventsError(readable);
-          setEventsPermissionIssue(false);
-        }
+        setEventsError(
+          typeof readable === "string"
+            ? readable
+            : "Unable to load itinerary events right now."
+        );
       });
 
     return () => {
@@ -2848,13 +2841,6 @@ function ItineraryDetailView({ currentUser }: { currentUser: User }) {
                 {eventStatusMessage ? (
                   <p className="profile-status calendar-status" role="status">
                     {eventStatusMessage}
-                  </p>
-                ) : null}
-                {eventsPermissionIssue ? (
-                  <p className="calendar-permission" role="note">
-                    Some older itinerary events can’t be displayed because they lack the owner metadata
-                    required by your Firestore rules. Recreate those events or add the `ownerUid`
-                    field via the Firebase console to restore access.
                   </p>
                 ) : null}
               </section>
