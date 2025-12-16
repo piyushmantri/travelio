@@ -49,7 +49,7 @@ If a default native database does not exist, create one in your preferred region
 gcloud firestore databases create --project cloud-run-day-2025-471903 --location=asia-south1
 ```
 
-The frontend writes itineraries with an `ownerUid` filter so each user only sees their own records. If you change regions or database IDs, update the Firebase configuration accordingly.
+The frontend writes itineraries with an `ownerUid` filter so each user only sees their own records, and stores the chosen display name for each account in `profiles/{uid}`. If you change regions or database IDs, update the Firebase configuration accordingly.
 
 ### Security rules
 

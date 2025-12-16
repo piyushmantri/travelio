@@ -6,6 +6,11 @@ service cloud.firestore {
       allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.ownerUid;
     }
 
+    match /profiles/{profileId} {
+      allow read: if request.auth != null && request.auth.uid == profileId;
+      allow create, update, delete: if request.auth != null && request.auth.uid == profileId;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -67,6 +67,12 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [mode, setMode] = useState<AuthMode>("sign-in");
+  const [profileName, setProfileName] = useState<string | null>(null);
+  const [profileDraft, setProfileDraft] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [itinerariesLoading, setItinerariesLoading] = useState(false);
   const [itineraryError, setItineraryError] = useState<string | null>(null);
@@ -82,6 +88,90 @@ function App() {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setProfileName(null);
+      setProfileDraft("");
+      setProfileLoading(false);
+      setProfileSaving(false);
+      setProfileMessage(null);
+      setProfileError(null);
+      return;
+    }
+
+    setProfileLoading(true);
+
+    let unsubscribe: Unsubscribe | undefined;
+    let isActive = true;
+
+    loadFirestoreModule()
+      .then(async (module) => {
+        if (!isActive) {
+          return;
+        }
+
+        const { doc, onSnapshot } = module;
+        const firestore = await getFirestoreInstance();
+        const profileRef = doc(firestore, "profiles", currentUser.uid);
+
+        unsubscribe = onSnapshot(
+          profileRef,
+          (snapshot) => {
+            if (!snapshot.exists()) {
+              setProfileName(null);
+              setProfileDraft("");
+              setProfileLoading(false);
+              setProfileError(null);
+              return;
+            }
+
+            const data = snapshot.data();
+            const rawName =
+              data && typeof data.displayName === "string"
+                ? data.displayName
+                : "";
+            const normalized = rawName.trim();
+
+            setProfileName(normalized || null);
+            setProfileDraft(normalized);
+            setProfileLoading(false);
+            setProfileError(null);
+          },
+          (error) => {
+            setProfileError(deriveReadableError(error));
+            setProfileLoading(false);
+          }
+        );
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+
+        setProfileError(deriveReadableError(error));
+        setProfileLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!profileMessage) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setProfileMessage(null);
+    }, 3000);
+
+    return () => window.clearTimeout(timeout);
+  }, [profileMessage]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -200,6 +290,49 @@ function App() {
   const isAuthenticating = phase === "loading";
   const isSignUp = mode === "sign-up";
 
+  const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!currentUser) {
+      setProfileError("You need to be signed in to update your name.");
+      return;
+    }
+
+    const trimmed = profileDraft.trim();
+
+    if (!trimmed) {
+      setProfileError("Please tell us what to call you.");
+      return;
+    }
+
+    if (trimmed === (profileName?.trim() ?? "")) {
+      setProfileMessage("Saved!");
+      return;
+    }
+
+    setProfileSaving(true);
+    setProfileError(null);
+    setProfileMessage(null);
+
+    try {
+      const [{ doc, setDoc }, firestore] = await Promise.all([
+        loadFirestoreModule(),
+        getFirestoreInstance(),
+      ]);
+
+      const profileRef = doc(firestore, "profiles", currentUser.uid);
+      await setDoc(profileRef, { displayName: trimmed }, { merge: true });
+
+      setProfileName(trimmed);
+      setProfileDraft(trimmed);
+      setProfileMessage("Saved!");
+    } catch (error) {
+      setProfileError(deriveReadableError(error));
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   const handleCreateItinerary = async (
     event: FormEvent<HTMLFormElement>
   ) => {
@@ -248,13 +381,51 @@ function App() {
             <div>
               <p className="signed-in-label">Travelio dashboard</p>
               <p className="signed-in-greeting">
-                Hi {currentUser.email ?? currentUser.uid}
+                Hi
+                {" "}
+                {profileName?.trim() || currentUser.displayName?.trim() || currentUser.email || currentUser.uid}
               </p>
             </div>
             <button className="secondary" type="button" onClick={handleSignOut}>
               Sign out
             </button>
           </header>
+
+          <section className="profile-panel" aria-live="polite">
+            <form className="profile-form" onSubmit={handleProfileSubmit}>
+              <label className="field profile-field">
+                <span>What should we call you?</span>
+                <input
+                  type="text"
+                  name="displayName"
+                  placeholder="Add a friendly name"
+                  value={profileDraft}
+                  onChange={(event) => setProfileDraft(event.target.value)}
+                  disabled={profileLoading || profileSaving}
+                  required
+                />
+              </label>
+              <button
+                className="secondary"
+                type="submit"
+                disabled={profileLoading || profileSaving}
+              >
+                {profileSaving ? "Saving..." : "Save name"}
+              </button>
+            </form>
+
+            {profileError ? (
+              <p className="error" role="alert">
+                {profileError}
+              </p>
+            ) : profileMessage ? (
+              <p className="profile-status" role="status">
+                {profileMessage}
+              </p>
+            ) : profileLoading ? (
+              <p className="muted">Loading profile...</p>
+            ) : null}
+          </section>
 
           <section className="card itinerary-card" aria-live="polite">
             <div className="section-heading">
