@@ -80,6 +80,7 @@ function App() {
   const [newItineraryTitle, setNewItineraryTitle] = useState("");
   const [newItineraryNotes, setNewItineraryNotes] = useState("");
   const [isCreatingItinerary, setIsCreatingItinerary] = useState(false);
+  const [isItineraryFormVisible, setIsItineraryFormVisible] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -182,6 +183,7 @@ function App() {
       setItineraryError(null);
       setNewItineraryTitle("");
       setNewItineraryNotes("");
+      setIsItineraryFormVisible(false);
       return;
     }
 
@@ -364,6 +366,7 @@ function App() {
 
       setNewItineraryTitle("");
       setNewItineraryNotes("");
+      setIsItineraryFormVisible(false);
     } catch (error) {
       setItineraryError(deriveReadableError(error));
     } finally {
@@ -449,53 +452,66 @@ function App() {
           <section className="card itinerary-card" aria-live="polite">
             <div className="section-heading">
               <h2>Your itineraries</h2>
-              <span className="badge">{itineraries.length}</span>
+              <div className="itinerary-actions">
+                <span className="badge">{itineraries.length}</span>
+                <button
+                  className="primary"
+                  type="button"
+                  onClick={() => {
+                    setIsItineraryFormVisible((visible) => !visible);
+                    setItineraryError(null);
+                  }}
+                  disabled={isCreatingItinerary}
+                >
+                  {isItineraryFormVisible ? "Close" : "New itinerary"}
+                </button>
+              </div>
             </div>
 
-            <form className="itinerary-form" onSubmit={handleCreateItinerary}>
-              <label className="field">
-                <span>Itinerary name</span>
-                <input
-                  type="text"
-                  name="itinerary-title"
-                  placeholder="Weekend getaway to Kyoto"
-                  value={newItineraryTitle}
-                  onChange={(event) => setNewItineraryTitle(event.target.value)}
-                  required
-                  disabled={isCreatingItinerary}
-                />
-              </label>
+            {isItineraryFormVisible ? (
+              <form className="itinerary-form" onSubmit={handleCreateItinerary}>
+                <label className="field">
+                  <span>Itinerary name</span>
+                  <input
+                    type="text"
+                    name="itinerary-title"
+                    placeholder="Weekend getaway to Kyoto"
+                    value={newItineraryTitle}
+                    onChange={(event) => setNewItineraryTitle(event.target.value)}
+                    required
+                    disabled={isCreatingItinerary}
+                  />
+                </label>
 
-              <label className="field">
-                <span>Notes</span>
-                <textarea
-                  name="itinerary-notes"
-                  placeholder="Add a quick summary or highlight key stops."
-                  value={newItineraryNotes}
-                  onChange={(event) => setNewItineraryNotes(event.target.value)}
-                  rows={4}
-                  disabled={isCreatingItinerary}
-                />
-              </label>
+                <label className="field">
+                  <span>Notes</span>
+                  <textarea
+                    name="itinerary-notes"
+                    placeholder="Add a quick summary or highlight key stops."
+                    value={newItineraryNotes}
+                    onChange={(event) => setNewItineraryNotes(event.target.value)}
+                    rows={4}
+                    disabled={isCreatingItinerary}
+                  />
+                </label>
 
-              <button className="primary" type="submit" disabled={isCreatingItinerary}>
-                {isCreatingItinerary ? "Saving..." : "Create itinerary"}
-              </button>
-            </form>
+                <button className="primary" type="submit" disabled={isCreatingItinerary}>
+                  {isCreatingItinerary ? "Saving..." : "Create itinerary"}
+                </button>
+              </form>
+            ) : null}
 
             {itineraryError ? (
               <p className="error" role="alert">
                 {itineraryError}
               </p>
-            ) : null}
-
-            {itinerariesLoading ? (
+            ) : itinerariesLoading ? (
               <p className="muted">Loading itineraries...</p>
             ) : itineraries.length ? (
-              <ul className="itinerary-list">
+              <div className="itinerary-grid">
                 {itineraries.map((itinerary) => (
-                  <li key={itinerary.id} className="itinerary-item">
-                    <div className="itinerary-title-row">
+                  <article key={itinerary.id} className="itinerary-card-item">
+                    <div className="itinerary-card-heading">
                       <h3>{itinerary.title}</h3>
                       {formatTimestamp(itinerary.createdAt) ? (
                         <span className="pill">
@@ -504,16 +520,16 @@ function App() {
                       ) : null}
                     </div>
                     {itinerary.description ? (
-                      <p className="itinerary-notes">{itinerary.description}</p>
+                      <p className="itinerary-card-notes">{itinerary.description}</p>
                     ) : (
                       <p className="muted">No notes added yet.</p>
                     )}
-                  </li>
+                  </article>
                 ))}
-              </ul>
+              </div>
             ) : (
               <p className="empty-state">
-                No itineraries yet. Create your first plan using the form above.
+                No itineraries yet. Use the button above to create one.
               </p>
             )}
           </section>
