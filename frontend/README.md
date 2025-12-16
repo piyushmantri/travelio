@@ -1,73 +1,48 @@
-# React + TypeScript + Vite
+# Travelio Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This Vite + React application renders the Travelio sign-in experience backed by Google Cloud Identity Platform (Firebase Authentication). Users authenticate with their Travelio (GCP) credentials before they can build itineraries.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+1. A Google Cloud project with [Identity Platform](https://cloud.google.com/identity-platform/docs/use-rest-api) (or Firebase Authentication) enabled.
+2. A web application registered in Identity Platform.
+3. The web app configuration values copied from the Google Cloud console.
 
-## React Compiler
+## Environment configuration
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Create a `.env.local` file in the `frontend` directory with the values from your GCP project:
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+VITE_FIREBASE_API_KEY="your-api-key"
+VITE_FIREBASE_AUTH_DOMAIN="your-project.firebaseapp.com"
+VITE_FIREBASE_PROJECT_ID="your-project-id"
+VITE_FIREBASE_STORAGE_BUCKET="your-project.appspot.com"
+VITE_FIREBASE_MESSAGING_SENDER_ID="1234567890"
+VITE_FIREBASE_APP_ID="1:1234567890:web:abcdef123456"
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+> These keys are surfaced through Vite's `import.meta.env` and used in `src/firebase.ts` to initialize the Firebase SDK.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Local development
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
+
+Visit the printed URL (default `http://localhost:5173`) and sign in with a user that exists in Identity Platform. The login view handles success/failure states and exposes a sign-out button once authenticated.
+
+## Production build
+
+```bash
+npm run build
+npm run preview
+```
+
+`npm run build` outputs a production-ready bundle under `dist/`. Deploy this directory to your chosen GCP hosting target (e.g., Cloud Run, Firebase Hosting, or Cloud Storage behind a load balancer).
+
+## Next steps
+
+- Gate itinerary creation routes behind the authenticated session returned by Firebase.
+- Integrate additional providers (Google, phone, etc.) through Identity Platform as needed.
+- Harden routing and state management for the broader Travelio experience.
