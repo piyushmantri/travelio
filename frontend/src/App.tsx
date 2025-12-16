@@ -792,11 +792,6 @@ function App() {
                   <article key={itinerary.id} className="itinerary-card-item">
                     <div className="itinerary-card-heading">
                       <h3>{itinerary.title}</h3>
-                      {formatTimestamp(itinerary.createdAt) ? (
-                        <span className="pill">
-                          {formatTimestamp(itinerary.createdAt)}
-                        </span>
-                      ) : null}
                     </div>
 
                     <p className="date-range" aria-label="Trip dates">
