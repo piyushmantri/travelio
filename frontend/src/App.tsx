@@ -165,10 +165,7 @@ function App() {
       )}
 
       <footer className="app-footer">
-        <p>
-          Authentication handled by Google Cloud Identity Platform. Configure your project keys
-          in <code>.env</code> files before deploying to GCP.
-        </p>
+        <p>Authentication handled by Google Cloud Identity Platform.</p>
       </footer>
     </div>
   );
