@@ -35,6 +35,28 @@
   gap: 1.5rem;
 }
 
+.signed-in-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0.5rem;
+}
+
+.signed-in-label {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.signed-in-greeting {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .auth-form {
   display: flex;
   flex-direction: column;

@@ -244,15 +244,17 @@ function App() {
 
       {currentUser ? (
         <>
-          <section className="card auth-card">
-            <h2>Welcome back</h2>
-            <p className="auth-message">
-              Signed in as <strong>{currentUser.email ?? currentUser.uid}</strong>.
-            </p>
+          <header className="signed-in-header">
+            <div>
+              <p className="signed-in-label">Travelio dashboard</p>
+              <p className="signed-in-greeting">
+                Hi {currentUser.email ?? currentUser.uid}
+              </p>
+            </div>
             <button className="secondary" type="button" onClick={handleSignOut}>
               Sign out
             </button>
-          </section>
+          </header>
 
           <section className="card itinerary-card" aria-live="polite">
             <div className="section-heading">
