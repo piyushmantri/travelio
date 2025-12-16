@@ -24,6 +24,8 @@ type Itinerary = {
     females: number;
     kids: number;
   };
+  startDate: string | null;
+  endDate: string | null;
 };
 
 const timestampFormatter = new Intl.DateTimeFormat(undefined, {
@@ -73,6 +75,52 @@ const coerceTravellerCount = (value: unknown): number => {
   return Math.floor(numericValue);
 };
 
+const normalizeDateInput = (value: string): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  // Expect YYYY-MM-DD from native date input
+  const matches = /^\d{4}-\d{2}-\d{2}$/.test(trimmed);
+  return matches ? trimmed : null;
+};
+
+const formatDateRange = (startDate: string | null, endDate: string | null): string => {
+  if (!startDate && !endDate) {
+    return "Dates not set";
+  }
+
+  const formatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
+
+  const safeFormat = (value: string | null): string | null => {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : formatter.format(date);
+  };
+
+  const formattedStart = safeFormat(startDate);
+  const formattedEnd = safeFormat(endDate);
+
+  if (formattedStart && formattedEnd) {
+    return `${formattedStart} – ${formattedEnd}`;
+  }
+
+  if (formattedStart) {
+    return `${formattedStart}`;
+  }
+
+  if (formattedEnd) {
+    return `${formattedEnd}`;
+  }
+
+  return "Dates not set";
+};
+
 function App() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -96,6 +144,10 @@ function App() {
     females: 0,
     kids: 0,
   });
+  const [newItineraryDates, setNewItineraryDates] = useState({
+    startDate: "",
+    endDate: "",
+  });
   const [isCreatingItinerary, setIsCreatingItinerary] = useState(false);
   const [isItineraryFormVisible, setIsItineraryFormVisible] = useState(false);
   const [editingItineraryId, setEditingItineraryId] = useState<string | null>(null);
@@ -103,6 +155,8 @@ function App() {
     males: 0,
     females: 0,
     kids: 0,
+    startDate: "",
+    endDate: "",
   });
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -208,6 +262,7 @@ function App() {
       setItineraryError(null);
       setNewItineraryTitle("");
       setNewItineraryTravellers({ males: 0, females: 0, kids: 0 });
+      setNewItineraryDates({ startDate: "", endDate: "" });
       setIsItineraryFormVisible(false);
       return;
     }
@@ -252,6 +307,14 @@ function App() {
                     females: coerceTravellerCount(travellersData.females),
                     kids: coerceTravellerCount(travellersData.kids),
                   },
+                  startDate:
+                    typeof data.startDate === "string"
+                      ? normalizeDateInput(data.startDate) ?? null
+                      : null,
+                  endDate:
+                    typeof data.endDate === "string"
+                      ? normalizeDateInput(data.endDate) ?? null
+                      : null,
                 } satisfies Itinerary;
               })
               .sort((first, second) => {
@@ -387,6 +450,19 @@ function App() {
       return;
     }
 
+    const normalizedStart = normalizeDateInput(newItineraryDates.startDate);
+    const normalizedEnd = normalizeDateInput(newItineraryDates.endDate);
+
+    if (!normalizedStart || !normalizedEnd) {
+      setItineraryError("Please provide both start and end dates for the trip.");
+      return;
+    }
+
+    if (new Date(normalizedStart) > new Date(normalizedEnd)) {
+      setItineraryError("Trip end date should be after the start date.");
+      return;
+    }
+
     const travellers = {
       males: coerceTravellerCount(newItineraryTravellers.males),
       females: coerceTravellerCount(newItineraryTravellers.females),
@@ -406,11 +482,14 @@ function App() {
         title: trimmedTitle,
         ownerUid: currentUser.uid,
         travellers,
+        startDate: normalizedStart,
+        endDate: normalizedEnd,
         createdAt: serverTimestamp(),
       });
 
       setNewItineraryTitle("");
       setNewItineraryTravellers({ males: 0, females: 0, kids: 0 });
+      setNewItineraryDates({ startDate: "", endDate: "" });
       setIsItineraryFormVisible(false);
     } catch (error) {
       setItineraryError(deriveReadableError(error));
@@ -421,14 +500,20 @@ function App() {
 
   const beginEditItinerary = (itinerary: Itinerary) => {
     setEditingItineraryId(itinerary.id);
-    setEditItineraryDraft({ ...itinerary.travellers });
+    setEditItineraryDraft({
+      males: itinerary.travellers.males,
+      females: itinerary.travellers.females,
+      kids: itinerary.travellers.kids,
+      startDate: itinerary.startDate ?? "",
+      endDate: itinerary.endDate ?? "",
+    });
     setEditError(null);
   };
 
   const cancelEditItinerary = () => {
     setEditingItineraryId(null);
     setEditError(null);
-    setEditItineraryDraft({ males: 0, females: 0, kids: 0 });
+    setEditItineraryDraft({ males: 0, females: 0, kids: 0, startDate: "", endDate: "" });
   };
 
   const handleUpdateItinerary = async (
@@ -439,6 +524,19 @@ function App() {
 
     if (!currentUser) {
       setEditError("You need to be signed in to update an itinerary.");
+      return;
+    }
+
+    const normalizedStart = normalizeDateInput(editItineraryDraft.startDate);
+    const normalizedEnd = normalizeDateInput(editItineraryDraft.endDate);
+
+    if (!normalizedStart || !normalizedEnd) {
+      setEditError("Please include both start and end dates.");
+      return;
+    }
+
+    if (new Date(normalizedStart) > new Date(normalizedEnd)) {
+      setEditError("Trip end date should be after the start date.");
       return;
     }
 
@@ -460,6 +558,8 @@ function App() {
       const itineraryRef = doc(firestore, "itineraries", itineraryId);
       await updateDoc(itineraryRef, {
         travellers,
+        startDate: normalizedStart,
+        endDate: normalizedEnd,
       });
 
       cancelEditItinerary();
@@ -579,6 +679,42 @@ function App() {
                   />
                 </label>
 
+                <div className="date-grid">
+                  <label className="field compact-field">
+                    <span>Start date</span>
+                    <input
+                      type="date"
+                      name="trip-start"
+                      value={newItineraryDates.startDate}
+                      onChange={(event) =>
+                        setNewItineraryDates((prev) => ({
+                          ...prev,
+                          startDate: event.target.value,
+                        }))
+                      }
+                      required
+                      disabled={isCreatingItinerary}
+                    />
+                  </label>
+
+                  <label className="field compact-field">
+                    <span>End date</span>
+                    <input
+                      type="date"
+                      name="trip-end"
+                      value={newItineraryDates.endDate}
+                      onChange={(event) =>
+                        setNewItineraryDates((prev) => ({
+                          ...prev,
+                          endDate: event.target.value,
+                        }))
+                      }
+                      required
+                      disabled={isCreatingItinerary}
+                    />
+                  </label>
+                </div>
+
                 <div className="traveller-grid">
                   <label className="field compact-field">
                     <span>Males</span>
@@ -663,6 +799,10 @@ function App() {
                       ) : null}
                     </div>
 
+                    <p className="date-range" aria-label="Trip dates">
+                      {formatDateRange(itinerary.startDate, itinerary.endDate)}
+                    </p>
+
                     <ul className="traveller-summary" aria-label="Traveller breakdown">
                       <li>
                         <span className="traveller-label">Males</span>
@@ -683,6 +823,39 @@ function App() {
                         className="itinerary-edit-form"
                         onSubmit={(event) => handleUpdateItinerary(event, itinerary.id)}
                       >
+                        <div className="date-grid">
+                          <label className="field compact-field">
+                            <span>Start date</span>
+                            <input
+                              type="date"
+                              value={editItineraryDraft.startDate}
+                              onChange={(event) =>
+                                setEditItineraryDraft((prev) => ({
+                                  ...prev,
+                                  startDate: event.target.value,
+                                }))
+                              }
+                              disabled={editSaving}
+                              required
+                            />
+                          </label>
+                          <label className="field compact-field">
+                            <span>End date</span>
+                            <input
+                              type="date"
+                              value={editItineraryDraft.endDate}
+                              onChange={(event) =>
+                                setEditItineraryDraft((prev) => ({
+                                  ...prev,
+                                  endDate: event.target.value,
+                                }))
+                              }
+                              disabled={editSaving}
+                              required
+                            />
+                          </label>
+                        </div>
+
                         <div className="traveller-grid">
                           <label className="field compact-field">
                             <span>Males</span>
