@@ -1,0 +1,37 @@
+:root {
+  color: #0f172a;
+  background-color: #0f172a0d;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, rgba(37, 99, 235, 0.12), transparent 55%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  padding: 24px;
+}
+
+#root {
+  width: min(1200px, 100%);
+  display: flex;
+  flex: 1;
+}
+
+button {
+  font-family: inherit;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
